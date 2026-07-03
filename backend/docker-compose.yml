@@ -1,0 +1,149 @@
+version: "3.9"
+
+services:
+  # ─── PostgreSQL Database ───────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: devinsight_postgres
+    environment:
+      POSTGRES_USER: devinsight
+      POSTGRES_PASSWORD: devinsight_dev_password
+      POSTGRES_DB: devinsight
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U devinsight -d devinsight"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - devinsight_net
+
+  # ─── Redis (ARQ Task Queue + Cache) ────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: devinsight_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    networks:
+      - devinsight_net
+
+  # ─── FastAPI Application (Backend API) ─────────────────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: devinsight_app
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://devinsight:devinsight_dev_password@postgres:5432/devinsight
+      REDIS_URL: redis://redis:6379/0
+      DEBUG: "true"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app          # Live reload in development
+      - faiss_data:/app/faiss_index
+      - hf_cache:/app/huggingface_cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+    networks:
+      - devinsight_net
+
+  # ─── ARQ Worker (Background Tasks Processing) ──────────────────────────────
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: devinsight_worker
+    environment:
+      DATABASE_URL: postgresql+asyncpg://devinsight:devinsight_dev_password@postgres:5432/devinsight
+      REDIS_URL: redis://redis:6379/0
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - faiss_data:/app/faiss_index
+      - hf_cache:/app/huggingface_cache
+    command: arq app.workers.settings.WorkerSettings
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1024M
+    networks:
+      - devinsight_net
+
+  # ─── TanStack Start Application (Frontend SSR) ─────────────────────────────
+  web:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: devinsight_web
+    ports:
+      - "3000:3000"
+    environment:
+      VITE_API_URL: http://localhost:8000
+    depends_on:
+      app:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    networks:
+      - devinsight_net
+
+volumes:
+  postgres_data:
+  redis_data:
+  faiss_data:
+  hf_cache:
+
+networks:
+  devinsight_net:
+    driver: bridge

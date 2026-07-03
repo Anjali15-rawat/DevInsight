@@ -1,0 +1,43 @@
+# ─── Web Framework ────────────────────────────────────────────────────────────
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# ─── Database ─────────────────────────────────────────────────────────────────
+sqlalchemy==2.0.41
+alembic==1.16.1
+asyncpg==0.30.0          # async PostgreSQL driver
+greenlet==3.2.3           # required by SQLAlchemy async
+
+# ─── Validation & Settings ────────────────────────────────────────────────────
+pydantic==2.11.7
+pydantic-settings==2.9.1
+python-dotenv==1.1.1
+
+# ─── Authentication ───────────────────────────────────────────────────────────
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+httpx==0.28.1             # async HTTP client (GitHub API calls)
+
+# ─── Task Queue ───────────────────────────────────────────────────────────────
+arq==0.26.3
+redis==5.2.1
+
+# ─── AI / LLM ─────────────────────────────────────────────────────────────────
+google-generativeai==0.8.5
+
+# ─── RAG / Embeddings ─────────────────────────────────────────────────────────
+sentence-transformers==3.4.1
+faiss-cpu>=1.10.0
+numpy==2.2.3
+
+# ─── Document Processing ──────────────────────────────────────────────────────
+pypdf==5.4.0              # PDF text extraction
+python-docx==1.1.2        # DOCX support (future)
+
+# ─── Logging ──────────────────────────────────────────────────────────────────
+structlog==25.4.0
+
+# ─── Utilities ────────────────────────────────────────────────────────────────
+python-dateutil==2.9.0
+tiktoken==0.9.0           # token counting (OpenAI-compatible for estimation)
